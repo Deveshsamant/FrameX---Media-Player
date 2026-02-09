@@ -12,6 +12,7 @@ export interface AppSettings {
     autoHideDelay: number;
     showFeatureCards: boolean;
     compactMode: boolean;
+    enableTimelinePreview: boolean;
     animationSpeed: 'slow' | 'normal' | 'fast';
 
     // Advanced
@@ -29,6 +30,7 @@ export const defaultSettings: AppSettings = {
     autoHideDelay: 1000,
     showFeatureCards: true,
     compactMode: false,
+    enableTimelinePreview: true,
     animationSpeed: 'normal',
     hardwareAcceleration: true,
     thumbnailCacheSize: 100,

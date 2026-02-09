@@ -43,9 +43,16 @@ pub fn run() {
             mpv_handler::mpv_set_loop,
             mpv_handler::mpv_add_volume,
             mpv_handler::mpv_seek_relative,
+            mpv_handler::mpv_seek_relative,
+            mpv_handler::mpv_get_hwdec_status,
+            mpv_handler::mpv_set_audio_filter,
+            mpv_handler::mpv_set_compressor,
             //
             file_scanner::list_videos, 
-            thumbnail_generator::generate_thumbnail
+            file_scanner::get_video_duration,
+            thumbnail_generator::generate_thumbnail,
+            thumbnail_generator::generate_seek_preview,
+            thumbnail_generator::generate_preview
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

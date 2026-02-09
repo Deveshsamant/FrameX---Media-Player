@@ -3,12 +3,20 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { Window } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
-import { Play, Pause, Settings, FolderOpen, Volume2, SkipBack, SkipForward, Maximize2, Minimize2, Film, Sparkles, MonitorPlay, Library, Grid, List, X, Minus, Square, Copy, ArrowLeft, Captions, Check } from "lucide-react";
+import {
+  Play, Pause, Settings, FolderOpen, Volume2, SkipBack, SkipForward,
+  Maximize2, Minimize2, Film, Sparkles, MonitorPlay, Library, Grid, List,
+  X, Minus, Square, Copy, ArrowLeft, Captions, Check, ArrowUpDown, Clock,
+  FileText, Calendar as CalendarIcon
+} from "lucide-react";
 import { useFile } from "./context/FileContext";
+import { useGestures } from "./hooks/useGestures";
 import SettingsModal from "./components/SettingsModal/SettingsModal";
 import HomeScreen from "./pages/HomeScreen";
 import EnhancedSettingsModal from "./components/EnhancedSettingsModal/EnhancedSettingsModal";
+import TimelinePreview from "./components/TimelinePreview";
 import { useTheme } from "./context/ThemeContext";
+import { useSettings } from "./context/SettingsContext";
 
 interface Track {
   id: number;
@@ -18,8 +26,19 @@ interface Track {
   selected: boolean;
 }
 
+interface VideoEntry {
+  path: string;
+  name: string;
+  size: number;
+  modified: number;
+  created: number;
+}
+
+type SortOption = 'name-asc' | 'name-desc' | 'size-asc' | 'size-desc' | 'duration-asc' | 'duration-desc' | 'date-asc' | 'date-desc';
+
 function App() {
   const { currentFile, setFile } = useFile();
+  const { settings } = useSettings();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPlayerActive, setIsPlayerActive] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -30,6 +49,11 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Timeline Preview State
+  const [previewTime, setPreviewTime] = useState(0);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewX, setPreviewX] = useState(0);
 
   // Player Settings State
   const [showSettings, setShowSettings] = useState(false);
@@ -48,8 +72,13 @@ function App() {
   const [showSubsMenu, setShowSubsMenu] = useState(false);
 
   // Library State
-  const [library, setLibrary] = useState<string[]>([]);
+  const [library, setLibrary] = useState<VideoEntry[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortOption, setSortOption] = useState<SortOption>('name-asc');
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const [durationCache, setDurationCache] = useState<Record<string, number>>({});
+  const [durationQueue, setDurationQueue] = useState<string[]>([]);
+  const [processingDuration, setProcessingDuration] = useState(false);
 
   // Window State
   const [isMaximized, setIsMaximized] = useState(false);
@@ -241,9 +270,14 @@ function App() {
       if (selected && typeof selected === 'string') {
         setIsLoading(true);
         // Invoke backend command to scan folder
-        const videos = await invoke<string[]>("list_videos", { folderPath: selected });
+        const videos = await invoke<VideoEntry[]>("list_videos", { folderPath: selected });
         setLibrary(videos);
         setFile(null); // Clear current file when opening folder
+
+        // Queue duration fetching
+        const paths = videos.map(v => v.path);
+        setDurationQueue(paths);
+
         setIsLoading(false);
       }
     } catch (err) {
@@ -251,6 +285,45 @@ function App() {
       setIsLoading(false);
     }
   }
+
+  // Duration Fetching Effect
+  useEffect(() => {
+    if (processingDuration || durationQueue.length === 0) return;
+
+    const fetchNextDuration = async () => {
+      setProcessingDuration(true);
+      const nextPath = durationQueue[0];
+
+      try {
+        // Skip if already cached
+        if (!durationCache[nextPath]) {
+          const dur = await invoke<number>("get_video_duration", { videoPath: nextPath });
+          setDurationCache(prev => ({ ...prev, [nextPath]: dur }));
+        }
+      } catch (e) {
+        console.error("Duration fetch failed for", nextPath, e);
+      } finally {
+        setDurationQueue(prev => prev.slice(1));
+        setProcessingDuration(false);
+      }
+    };
+
+    fetchNextDuration();
+  }, [durationQueue, processingDuration, durationCache]);
+
+  const sortedLibrary = [...library].sort((a, b) => {
+    switch (sortOption) {
+      case 'name-asc': return a.name.localeCompare(b.name);
+      case 'name-desc': return b.name.localeCompare(a.name);
+      case 'size-asc': return a.size - b.size;
+      case 'size-desc': return b.size - a.size;
+      case 'duration-asc': return (durationCache[a.path] || 0) - (durationCache[b.path] || 0);
+      case 'duration-desc': return (durationCache[b.path] || 0) - (durationCache[a.path] || 0);
+      case 'date-asc': return a.created - b.created;
+      case 'date-desc': return b.created - a.created;
+      default: return 0;
+    }
+  });
 
   async function handlePlay(path?: string) {
     const target = path || currentFile;
@@ -274,19 +347,21 @@ function App() {
 
   // Next/Previous Video Navigation
   function playPreviousVideo() {
-    if (library.length === 0) return;
-    const currentIndex = library.indexOf(currentFile || "");
+    if (sortedLibrary.length === 0) return;
+    const currentPath = currentFile || "";
+    const currentIndex = sortedLibrary.findIndex(v => v.path === currentPath);
     if (currentIndex <= 0) return; // Already at first video
-    const prevVideo = library[currentIndex - 1];
-    handlePlay(prevVideo);
+    const prevVideo = sortedLibrary[currentIndex - 1];
+    handlePlay(prevVideo.path);
   }
 
   function playNextVideo() {
-    if (library.length === 0) return;
-    const currentIndex = library.indexOf(currentFile || "");
-    if (currentIndex === -1 || currentIndex >= library.length - 1) return; // Not found or already at last video
-    const nextVideo = library[currentIndex + 1];
-    handlePlay(nextVideo);
+    if (sortedLibrary.length === 0) return;
+    const currentPath = currentFile || "";
+    const currentIndex = sortedLibrary.findIndex(v => v.path === currentPath);
+    if (currentIndex === -1 || currentIndex >= sortedLibrary.length - 1) return; // Not found or already at last video
+    const nextVideo = sortedLibrary[currentIndex + 1];
+    handlePlay(nextVideo.path);
   }
 
   async function togglePause() {
@@ -313,8 +388,24 @@ function App() {
       await invoke("set_volume", { volume: clampedVolume });
     } catch (err) {
       console.error("Failed to set volume:", err);
+      console.error("Failed to set volume:", err);
     }
   }
+
+  const handleVolumeChange = (delta: number) => {
+    setVolume(prev => {
+      const newVol = Math.max(0, Math.min(300, prev + delta));
+      invoke("set_volume", { volume: newVol });
+      return newVol;
+    });
+  };
+
+  const gestureHandlers = useGestures({
+    onVolumeChange: handleVolumeChange,
+    onSeek: (delta) => handleSeek(delta),
+    onTogglePause: togglePause,
+    onToggleFullscreen: toggleFullscreen
+  });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -346,6 +437,7 @@ function App() {
 
   // Parent-level thumbnail cache (persists across child re-renders)
   const [thumbnailCache, setThumbnailCache] = useState<Record<string, string>>({});
+  const [previewCache, setPreviewCache] = useState<Record<string, string>>({});
 
   // Process Queue Effect
   useEffect(() => {
@@ -389,8 +481,32 @@ function App() {
     setShowSubsMenu(false);
   };
 
+  const handleTimelineMouseMove = (e: React.MouseEvent<HTMLInputElement>) => {
+    if (!settings.enableTimelinePreview) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const width = rect.width;
+    const percentage = Math.max(0, Math.min(1, x / width));
+    const time = percentage * duration;
+
+    setPreviewTime(time);
+    setPreviewX(x + rect.left); // Absolute page X or relative? 
+    // Component uses fixed/absolute positioning. Let's send e.clientX or x relative to something.
+    // TimelinePreview uses fixed left:{xPosition}. So e.clientX is good? No, rect.left + x.
+    // Actually, xPosition in TimelinePreview is applied to `left` style.
+    // Let's use rect.left + x for page-relative.
+    setPreviewX(rect.left + x);
+    setPreviewVisible(true);
+  };
+
+  const handleTimelineMouseLeave = () => {
+    setPreviewVisible(false);
+  };
+
   return (
     <div className={`h-screen w-screen flex flex-col overflow-hidden font-sans selection:bg-violet-500/30 ${isPlayerActive ? 'bg-transparent' : 'bg-slate-950'}`}>
+
       {/* 3D Background Mesh Gradient (Hidden when playing) */}
       {!isPlayerActive && (
         <div className="fixed inset-0 overflow-hidden pointer-events-none perspective-[2000px]">
@@ -470,6 +586,70 @@ function App() {
                   <Library className="text-violet-400" /> Library <span className="text-slate-500 text-sm font-normal">({library.length} items)</span>
                 </h2>
                 <div className="flex items-center gap-2 bg-white/5 p-1 rounded-lg border border-white/10">
+                  {/* Sort Button */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowSortMenu(!showSortMenu)}
+                      className={`p-2 rounded-md transition-all ${showSortMenu ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`}
+                      title="Sort"
+                    >
+                      <ArrowUpDown size={18} />
+                    </button>
+                    {showSortMenu && (
+                      <div className="absolute top-full right-0 mt-2 w-48 bg-slate-900 border border-white/10 rounded-lg shadow-xl py-1 z-50 animate-fade-in">
+                        {/* Name Sort */}
+                        <div className="px-3 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">Name</div>
+                        <button onClick={() => { setSortOption('name-asc'); setShowSortMenu(false); }} className={`w-full px-4 py-2 text-left text-sm hover:bg-white/5 flex items-center justify-between ${sortOption === 'name-asc' ? 'text-violet-400' : 'text-slate-300'}`}>
+                          <span>A to Z</span>
+                          {sortOption === 'name-asc' && <Check size={14} />}
+                        </button>
+                        <button onClick={() => { setSortOption('name-desc'); setShowSortMenu(false); }} className={`w-full px-4 py-2 text-left text-sm hover:bg-white/5 flex items-center justify-between ${sortOption === 'name-desc' ? 'text-violet-400' : 'text-slate-300'}`}>
+                          <span>Z to A</span>
+                          {sortOption === 'name-desc' && <Check size={14} />}
+                        </button>
+
+                        <div className="h-px bg-white/10 my-1" />
+
+                        {/* Size Sort */}
+                        <div className="px-3 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><FileText size={12} /> Size</div>
+                        <button onClick={() => { setSortOption('size-asc'); setShowSortMenu(false); }} className={`w-full px-4 py-2 text-left text-sm hover:bg-white/5 flex items-center justify-between ${sortOption === 'size-asc' ? 'text-violet-400' : 'text-slate-300'}`}>
+                          <span>Smallest First</span>
+                          {sortOption === 'size-asc' && <Check size={14} />}
+                        </button>
+                        <button onClick={() => { setSortOption('size-desc'); setShowSortMenu(false); }} className={`w-full px-4 py-2 text-left text-sm hover:bg-white/5 flex items-center justify-between ${sortOption === 'size-desc' ? 'text-violet-400' : 'text-slate-300'}`}>
+                          <span>Largest First</span>
+                          {sortOption === 'size-desc' && <Check size={14} />}
+                        </button>
+
+                        <div className="h-px bg-white/10 my-1" />
+
+                        {/* Duration Sort */}
+                        <div className="px-3 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><Clock size={12} /> Duration</div>
+                        <button onClick={() => { setSortOption('duration-asc'); setShowSortMenu(false); }} className={`w-full px-4 py-2 text-left text-sm hover:bg-white/5 flex items-center justify-between ${sortOption === 'duration-asc' ? 'text-violet-400' : 'text-slate-300'}`}>
+                          <span>Shortest First</span>
+                          {sortOption === 'duration-asc' && <Check size={14} />}
+                        </button>
+                        <button onClick={() => { setSortOption('duration-desc'); setShowSortMenu(false); }} className={`w-full px-4 py-2 text-left text-sm hover:bg-white/5 flex items-center justify-between ${sortOption === 'duration-desc' ? 'text-violet-400' : 'text-slate-300'}`}>
+                          <span>Longest First</span>
+                          {sortOption === 'duration-desc' && <Check size={14} />}
+                        </button>
+
+                        <div className="h-px bg-white/10 my-1" />
+
+                        {/* Date Sort */}
+                        <div className="px-3 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2"><CalendarIcon size={12} /> Date</div>
+                        <button onClick={() => { setSortOption('date-asc'); setShowSortMenu(false); }} className={`w-full px-4 py-2 text-left text-sm hover:bg-white/5 flex items-center justify-between ${sortOption === 'date-asc' ? 'text-violet-400' : 'text-slate-300'}`}>
+                          <span>Oldest First</span>
+                          {sortOption === 'date-asc' && <Check size={14} />}
+                        </button>
+                        <button onClick={() => { setSortOption('date-desc'); setShowSortMenu(false); }} className={`w-full px-4 py-2 text-left text-sm hover:bg-white/5 flex items-center justify-between ${sortOption === 'date-desc' ? 'text-violet-400' : 'text-slate-300'}`}>
+                          <span>Newest First</span>
+                          {sortOption === 'date-desc' && <Check size={14} />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="w-px h-4 bg-white/10 mx-1" />
                   <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`}><Grid size={18} /></button>
                   <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`}><List size={18} /></button>
                 </div>
@@ -477,17 +657,21 @@ function App() {
 
               <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
                 <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-1'}`}>
-                  {library.map((path, _) => (
+                  {sortedLibrary.map((entry, _) => (
                     <ThumbnailCard
-                      key={path}
-                      path={path}
+                      key={entry.path}
+                      path={entry.path}
+                      entry={entry}
                       viewMode={viewMode}
-                      onPlay={() => handlePlay(path)}
+                      onPlay={() => handlePlay(entry.path)}
                       addToQueue={addToQueue}
                       removeFromProcessing={removeFromProcessing}
-                      shouldLoad={processing.includes(path)}
+                      shouldLoad={processing.includes(entry.path)}
                       thumbnailCache={thumbnailCache}
                       setThumbnailCache={setThumbnailCache}
+                      previewCache={previewCache}
+                      setPreviewCache={setPreviewCache}
+                      duration={durationCache[entry.path]}
                     />
                   ))}
                 </div>
@@ -541,13 +725,15 @@ function App() {
         </main>
       )}
 
-      {/* Player Click Overlay */}
+      {/* Player Click Overlay & Gestures */}
       {isPlayerActive && (
         <div
           className="flex-1 w-full relative z-40 transition-opacity duration-200 hover:bg-white/5"
-          onClick={togglePause}
-          onDoubleClick={toggleFullscreen}
-          title="Click to Pause, Double Click for Fullscreen"
+          onPointerDown={gestureHandlers.handlePointerDown}
+          onPointerMove={gestureHandlers.handlePointerMove}
+          onPointerUp={gestureHandlers.handlePointerUp}
+          onDoubleClick={gestureHandlers.handleDoubleClick}
+          title="Tap to Pause, Double Tap for Fullscreen, Drag R-Side for Volume"
         />
       )}
 
@@ -556,7 +742,15 @@ function App() {
         <footer className={`relative z-50 min-h-20 px-4 md:px-8 py-3 backdrop-blur-xl bg-slate-950/90 border-t border-white/5 flex flex-col gap-3 mt-auto transition-opacity duration-300 ${!showControls ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
 
           {/* Progress Bar */}
-          <div className="w-full flex items-center gap-3 px-1 my-1">
+          <div className="w-full flex items-center gap-3 px-1 my-1 relative group/timeline">
+            <TimelinePreview
+              path={currentFile || ""}
+              time={previewTime}
+              duration={duration}
+              visible={previewVisible}
+              xPosition={previewX}
+            />
+
             <span className="text-xs font-medium text-slate-300 w-12 text-right">{formatTime(currentTime)}</span>
             <input
               type="range"
@@ -570,9 +764,11 @@ function App() {
               }}
               onMouseDown={() => setIsDragging(true)}
               onMouseUp={() => setIsDragging(false)}
+              onMouseMove={handleTimelineMouseMove}
+              onMouseLeave={handleTimelineMouseLeave}
               className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-violet-500
               [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md hover:[&::-webkit-slider-thumb]:scale-125 transition-all
-              [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
+              [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 z-20 relative"
               style={{
                 background: `linear-gradient(to right, rgb(139 92 246) 0%, rgb(139 92 246) ${(currentTime / (duration || 1)) * 100}%, rgba(255,255,255,0.1) ${(currentTime / (duration || 1)) * 100}%, rgba(255,255,255,0.1) 100%)`
               }}
@@ -595,7 +791,7 @@ function App() {
               </button>
               <button
                 onClick={playPreviousVideo}
-                disabled={library.length === 0 || library.indexOf(currentFile || "") <= 0}
+                disabled={sortedLibrary.length === 0 || sortedLibrary.findIndex(v => v.path === (currentFile || "")) <= 0}
                 className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Previous Video"
               >
@@ -612,7 +808,7 @@ function App() {
             <div className="flex items-center gap-1">
               <button
                 onClick={playNextVideo}
-                disabled={library.length === 0 || library.indexOf(currentFile || "") >= library.length - 1}
+                disabled={sortedLibrary.length === 0 || sortedLibrary.findIndex(v => v.path === (currentFile || "")) >= sortedLibrary.length - 1}
                 className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 title="Next Video"
               >
@@ -812,19 +1008,27 @@ function TiltCard({ children, className }: { children: React.ReactNode, classNam
 }
 
 // Thumbnail Card Component with async loading
-function ThumbnailCard({ path, viewMode, onPlay, addToQueue, removeFromProcessing, shouldLoad, thumbnailCache, setThumbnailCache }: {
+function ThumbnailCard({ path, entry, viewMode, onPlay, addToQueue, removeFromProcessing, shouldLoad, thumbnailCache, setThumbnailCache, previewCache, setPreviewCache, duration }: {
   path: string,
+  entry: VideoEntry,
   viewMode: 'grid' | 'list',
   onPlay: () => void,
   addToQueue: (path: string) => void,
   removeFromProcessing: (path: string) => void,
   shouldLoad: boolean,
   thumbnailCache: Record<string, string>,
-  setThumbnailCache: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  setThumbnailCache: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+  previewCache: Record<string, string>,
+  setPreviewCache: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+  duration?: number
 }) {
   // Use cached thumbnail if available
   const thumb = thumbnailCache[path] || null;
+  const preview = previewCache[path] || null;
   const [hasRequested, setHasRequested] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [previewError, setPreviewError] = useState(false); // Track preview load errors
+  const hoverTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Add to queue on mount (only if not already cached)
@@ -833,6 +1037,11 @@ function ThumbnailCard({ path, viewMode, onPlay, addToQueue, removeFromProcessin
     }
   }, [path, addToQueue, thumbnailCache]);
 
+  // Reset error when path changes
+  useEffect(() => {
+    setPreviewError(false);
+  }, [path]);
+
   useEffect(() => {
     if (shouldLoad && !hasRequested && !thumb) {
       setHasRequested(true);
@@ -840,7 +1049,6 @@ function ThumbnailCard({ path, viewMode, onPlay, addToQueue, removeFromProcessin
       async function loadThumb() {
         try {
           const data = await invoke<string>("generate_thumbnail", { videoPath: path });
-          console.log("Thumb received for:", path);
           // Store in parent cache (persists even if this component unmounts)
           setThumbnailCache(prev => ({ ...prev, [path]: data }));
         } catch (e) {
@@ -853,20 +1061,55 @@ function ThumbnailCard({ path, viewMode, onPlay, addToQueue, removeFromProcessin
     }
   }, [shouldLoad, hasRequested, thumb, path, removeFromProcessing, setThumbnailCache]);
 
+  // Handle hover preview loading
+  useEffect(() => {
+    if (isHovered && !preview && !previewError) {
+      hoverTimeoutRef.current = window.setTimeout(async () => {
+        try {
+          const data = await invoke<string>("generate_preview", { videoPath: path });
+          setPreviewCache(prev => ({ ...prev, [path]: data }));
+        } catch (e) {
+          console.error("Preview error for", path, ":", e);
+          setPreviewError(true);
+        }
+      }, 600); // 600ms delay before loading preview
+    } else {
+      if (hoverTimeoutRef.current) {
+        window.clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+    }
+    return () => {
+      if (hoverTimeoutRef.current) {
+        window.clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, [isHovered, preview, previewError, path, setPreviewCache]);
+
   return (
     <div
       onDoubleClick={onPlay}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={`group relative bg-white/5 hover:bg-white/10 border border-white/5 hover:border-violet-500/50 rounded-xl overflow-hidden transition-all duration-300 cursor-pointer ${viewMode === 'list' ? 'flex items-center gap-4 p-4' : 'aspect-video flex flex-col'}`}
     >
       <div className={`${viewMode === 'list' ? 'w-24 h-16 shrink-0' : 'flex-1'} relative flex items-center justify-center bg-black/40 group-hover:bg-violet-500/20 transition-colors overflow-hidden`}>
-        {thumb ? (
+        {isHovered && preview && !previewError ? (
+          <img
+            src={preview}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover animate-fade-in"
+            onError={() => setPreviewError(true)}
+          />
+        ) : thumb ? (
           <img src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300" />
         ) : (
           <Film className={`text-slate-600 group-hover:text-violet-400 transition-colors ${viewMode === 'list' ? 'w-6 h-6' : 'w-10 h-10'} ${shouldLoad ? 'animate-pulse' : ''}`} />
         )}
 
-        {/* Hover Overlay with Play Button */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 bg-gradient-to-t from-black/80 via-black/50 to-black/30 z-10">
+        {/* Hover Overlay with Play Button - Only show if not previewing (or keep it?) */}
+        {/* If preview is playing, maybe hide the play button overlay to let user see preview? Or keep it for clarity? User said "preview of video". Usually preview replaces static thumb but overlay remains. */}
+        <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-300 bg-gradient-to-t from-black/80 via-black/50 to-black/30 z-10 ${isHovered && !preview ? 'opacity-100' : 'opacity-0'}`}>
           <button
             onClick={(e) => { e.stopPropagation(); onPlay(); }}
             className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-lg shadow-lg shadow-violet-500/30 transform hover:scale-105 active:scale-95 transition-all duration-200"
@@ -874,14 +1117,35 @@ function ThumbnailCard({ path, viewMode, onPlay, addToQueue, removeFromProcessin
             <Play size={18} fill="currentColor" />
             <span>Play Video</span>
           </button>
-          <p className="text-xs text-slate-400 mt-2">or double-click</p>
         </div>
+
+        {/* If preview IS showing, we might want a small indicator or just let it play. 
+            The gradient overlay might obscure the preview. Let's make it more transparent or auto-hide after a while?
+            For now, let's keep it simple: Show preview instead of thumb. The play button overlay is nice but blocks view.
+            I used `opacity-0` above when preview is active? 
+            Actually, the user wants PREVIEW.
+            If I make overlay disappear when preview is ready, user can see the video.
+            I changed the condition above: `${isHovered && !preview ? 'opacity-100' : 'opacity-0'}`
+            Wait, if preview loads, `preview` is truthy, so `!preview` is false -> opacity-0.
+            But `isHovered` is true.
+            So when preview loads, the play button disappears? That might be confusing.
+            Maybe keep the play button but make it smaller or less intrusive?
+            Or maybe show it only on hover but if preview plays, just show a small play icon in corner?
+            Let's stick to standard behavior: Preview plays, but controls/overlay are minimal.
+            I'll just let the play button hide when preview starts so user can see content.
+        */}
       </div>
-      <div className={`p-3 ${viewMode === 'list' ? 'flex-1 min-w-0' : 'relative z-20 bg-gradient-to-t from-black/80 to-transparent -mt-12 pt-8'}`}>
+      <div className={`p-3 ${viewMode === 'list' ? 'flex-1 min-w-0' : 'relative z-20 bg-gradient-to-t from-black/80 to-transparent -mt-12 pt-8 pointer-events-none'}`}>
         <p className="text-sm font-medium text-slate-200 truncate group-hover:text-white transition-colors drop-shadow-md">
           {path.split(/[\\/]/).pop()}
         </p>
-        <p className={`text-xs text-slate-500 truncate mt-0.5 ${viewMode !== 'list' && 'hidden'}`}>{path}</p>
+        <p className="text-xs text-slate-500 truncate mt-0.5 flex items-center justify-between">
+          <span className={viewMode !== 'list' ? 'hidden' : ''}>{path}</span>
+          <span className="flex items-center gap-2">
+            <span>{(entry.size / (1024 * 1024)).toFixed(1)} MB</span>
+            {duration && <span>{Math.floor(duration / 60)}:{Math.floor(duration % 60).toString().padStart(2, '0')}</span>}
+          </span>
+        </p>
       </div>
     </div>
   );
