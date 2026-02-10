@@ -5,9 +5,9 @@ import { Window } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import {
   Play, Pause, Settings, FolderOpen, Volume2, SkipBack, SkipForward,
-  Maximize2, Minimize2, Film, Sparkles, MonitorPlay, Library, Grid, List,
+  Maximize2, Minimize2, Film, MonitorPlay, Library, Grid, List,
   X, Minus, Square, Copy, ArrowLeft, Captions, Check, ArrowUpDown, Clock,
-  FileText, Calendar as CalendarIcon
+  FileText, Calendar as CalendarIcon, Brain
 } from "lucide-react";
 import { useFile } from "./context/FileContext";
 import { useGestures } from "./hooks/useGestures";
@@ -15,8 +15,8 @@ import SettingsModal from "./components/SettingsModal/SettingsModal";
 import HomeScreen from "./pages/HomeScreen";
 import EnhancedSettingsModal from "./components/EnhancedSettingsModal/EnhancedSettingsModal";
 import TimelinePreview from "./components/TimelinePreview";
-import { useTheme } from "./context/ThemeContext";
 import { useSettings } from "./context/SettingsContext";
+import { AISidebar } from "./components/AISidebar/AISidebar";
 
 interface Track {
   id: number;
@@ -61,7 +61,28 @@ function App() {
   const [loopMode, setLoopMode] = useState("off");
 
   // App Settings State
+  // App Settings State
   const [showAppSettings, setShowAppSettings] = useState(false);
+  const [showAISidebar, setShowAISidebar] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+
+  useEffect(() => {
+    const key = localStorage.getItem('gemini_api_key');
+    if (key) setApiKey(key);
+
+    // Listen for storage updates (in case settings change it)
+    const handleStorageChange = () => {
+      const newKey = localStorage.getItem('gemini_api_key');
+      if (newKey) setApiKey(newKey);
+    };
+    window.addEventListener('storage', handleStorageChange);
+    // Custom event for same-window updates
+    window.addEventListener('api-key-updated', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('api-key-updated', handleStorageChange);
+    };
+  }, []);
 
   // Playback Speed State
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
@@ -92,6 +113,21 @@ function App() {
     updateMaximizedState();
     window.addEventListener('resize', updateMaximizedState);
     return () => window.removeEventListener('resize', updateMaximizedState);
+  }, []);
+
+  // Load Last Opened Folder on Startup
+  useEffect(() => {
+    const loadLastFolder = async () => {
+      try {
+        const lastFolder = await invoke<string | null>("get_last_folder");
+        if (lastFolder) {
+          await loadFolder(lastFolder);
+        }
+      } catch (err) {
+        console.error("Failed to load last folder:", err);
+      }
+    };
+    loadLastFolder();
   }, []);
 
   // MPV Progress Listener
@@ -260,6 +296,29 @@ function App() {
     }
   }
 
+  async function loadFolder(path: string) {
+    setIsLoading(true);
+    try {
+      // Invoke backend command to scan folder
+      const videos = await invoke<VideoEntry[]>("list_videos", { folderPath: path });
+      setLibrary(videos);
+
+      // If manually loading a folder, we might want to clear the current file?
+      // But if we are starting up, currentFile is null anyway.
+      // If we are switching folders, yes.
+      setFile(null);
+
+      // Queue duration fetching
+      const paths = videos.map(v => v.path);
+      setDurationQueue(paths);
+
+    } catch (err) {
+      console.error("Failed to load folder:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function handleOpenFolder() {
     try {
       const selected = await open({
@@ -268,17 +327,7 @@ function App() {
       });
 
       if (selected && typeof selected === 'string') {
-        setIsLoading(true);
-        // Invoke backend command to scan folder
-        const videos = await invoke<VideoEntry[]>("list_videos", { folderPath: selected });
-        setLibrary(videos);
-        setFile(null); // Clear current file when opening folder
-
-        // Queue duration fetching
-        const paths = videos.map(v => v.path);
-        setDurationQueue(paths);
-
-        setIsLoading(false);
+        await loadFolder(selected);
       }
     } catch (err) {
       console.error("Failed to open folder:", err);
@@ -738,6 +787,10 @@ function App() {
       )}
 
       {/* Control Bar - Extended */}
+      {showAISidebar && (
+        <AISidebar videoPath={currentFile} apiKey={apiKey} />
+      )}
+
       {isPlayerActive && (
         <footer className={`relative z-50 min-h-20 px-4 md:px-8 py-3 backdrop-blur-xl bg-slate-950/90 border-t border-white/5 flex flex-col gap-3 mt-auto transition-opacity duration-300 ${!showControls ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
 
@@ -746,7 +799,6 @@ function App() {
             <TimelinePreview
               path={currentFile || ""}
               time={previewTime}
-              duration={duration}
               visible={previewVisible}
               xPosition={previewX}
             />
@@ -828,6 +880,17 @@ function App() {
 
           {/* Bottom Row: Volume & Settings */}
           <div className="flex items-center justify-between gap-4">
+            {/* AI Toggle */}
+            <button
+              onClick={() => setShowAISidebar(!showAISidebar)}
+              className={`p-2 rounded-lg transition-all ${showAISidebar ? 'text-violet-400 bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+              title="AI Features"
+            >
+              <Brain size={20} />
+            </button>
+
+            <div className="w-px h-8 bg-white/10 mx-2" />
+
             {/* Volume Control */}
             <div className="flex items-center gap-3 flex-1 max-w-xs">
               <button

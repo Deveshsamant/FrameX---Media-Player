@@ -1,4 +1,4 @@
-import { FolderOpen, Library, Film, MonitorPlay, Sparkles, Play } from 'lucide-react';
+import { FolderOpen, Library, Film, MonitorPlay, Sparkles } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 

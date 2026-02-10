@@ -4,14 +4,12 @@ import { invoke } from '@tauri-apps/api/core';
 interface TimelinePreviewProps {
     path: string;
     time: number;
-    duration: number;
     visible: boolean;
     xPosition: number; // Pixel position for absolute positioning
 }
 
-export default function TimelinePreview({ path, time, duration, visible, xPosition }: TimelinePreviewProps) {
+export default function TimelinePreview({ path, time, visible, xPosition }: TimelinePreviewProps) {
     const [imageUrl, setImageUrl] = useState<string | null>(null);
-    const lastTimeRef = useRef<number>(0);
     const timeoutRef = useRef<number | null>(null);
 
     useEffect(() => {

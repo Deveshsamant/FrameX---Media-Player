@@ -7,6 +7,8 @@ fn greet(name: &str) -> String {
 mod mpv_handler;
 mod file_scanner;
 mod thumbnail_generator;
+mod config;
+mod ai;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,6 +17,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             greet, 
             mpv_handler::play_video, 
@@ -52,7 +56,13 @@ pub fn run() {
             file_scanner::get_video_duration,
             thumbnail_generator::generate_thumbnail,
             thumbnail_generator::generate_seek_preview,
-            thumbnail_generator::generate_preview
+            thumbnail_generator::generate_preview,
+            // Config
+            config::save_last_folder,
+            config::get_last_folder,
+            // AI
+            ai::whisper::run_whisper,
+
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

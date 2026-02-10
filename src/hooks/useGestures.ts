@@ -1,5 +1,4 @@
 import { useRef, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 
 interface GestureOptions {
     onVolumeChange: (delta: number) => void;
@@ -42,15 +41,14 @@ export function useGestures({ onVolumeChange, onSeek, onTogglePause, onToggleFul
             }
         }
 
-        const { innerWidth, innerHeight } = window;
+        const { innerWidth } = window;
         const isRightSide = startX.current > innerWidth / 2;
 
         // Normalize deltas
         // Up/Down
         if (Math.abs(deltaY) > Math.abs(deltaX)) {
             // Vertical Drag
-            const sensitivity = 0.5; // Volume step per pixel
-            const step = -deltaY * sensitivity; // Up is negative Y, but positive volume
+            // Up is negative Y, but positive volume
 
             // Reset start to current to simulate continuous "scrubbing" not absolute
             // Actually, continuous delta is better.

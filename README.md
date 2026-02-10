@@ -1,21 +1,30 @@
 # FrameX - Media Player
 
-FrameX is a modern, high-performance media player built with Tauri, React, and Vite. It leverages the power of Rust for the backend and the flexibility of React for the user interface, providing a seamless media playback experience.
+FrameX is a modern, high-performance media player built with Tauri, React, and Vite. It combines the power of Rust backend with a sleek React frontend to deliver a premium cinematic experience.
 
 ## Features
 
-- **Modern UI**: Sleek and responsive interface designed with Tailwind CSS.
-- **High Performance**: Built on Tauri for a lightweight and fast native experience.
-- **Media Playback**: Supports various audio and video formats.
-- **Overlay Mode**: Includes a player overlay for multitasking.
+- **Modern UI**: Beautiful dark-themed interface with glassmorphism effects and smooth animations.
+- **High Performance**: Native performance powered by Tauri and Rust.
+- **Media Playback**: Professional-grade playback engine based on `libmpv`.
+- **AI Subtitles**: Generate English subtitles locally using OpenAI Whisper (privacy-focused, no cloud keys required).
+- **Smart Library**: Auto-detects media files, remembers playback positions, and supports folder navigation.
+- **Customizable**: extensive settings for playback, themes, and UI preferences.
 
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
+Before running the application, ensure you have the following installed:
 
-- **Node.js** (v16 or later)
-- **Rust & Cargo** (required for Tauri)
-  - Follow the [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites) guide to set up your environment.
+1.  **Node.js** (v16+)
+2.  **Rust & Cargo** (latest stable)
+    -   Follow the [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites) guide.
+3.  **Python 3.8+** (Required for Whisper AI)
+4.  **FFmpeg** (Required for Whisper and thumbnail generation)
+    -   Ensure `ffmpeg` is in your system PATH.
+5.  **OpenAI Whisper**:
+    ```bash
+    pip install openai-whisper
+    ```
 
 ## Installation
 
@@ -25,13 +34,9 @@ Before you begin, ensure you have the following installed:
     cd FrameX---Media-Player
     ```
 
-2.  Install dependencies:
+2.  Install frontend dependencies:
     ```bash
     npm install
-    # or
-    yarn install
-    # or
-    pnpm install
     ```
 
 ## Usage
@@ -44,21 +49,19 @@ To run the application in development mode with hot-reloading:
 npm run tauri dev
 ```
 
-This command will start the frontend dev server and the Tauri application window.
-
 ### Build
 
-To build the application for production:
+To create a production build for your OS:
 
 ```bash
 npm run tauri build
 ```
 
-This will create a dedicated installer or executable for your operating system in the `src-tauri/target/release/bundle` directory.
+The installer/imaged executable will be in `src-tauri/target/release/bundle`.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please submit a Pull Request.
 
 ## License
 

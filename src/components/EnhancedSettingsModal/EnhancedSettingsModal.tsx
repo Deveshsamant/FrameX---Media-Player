@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Palette, Play, Layout, Info, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Palette, Play, Layout, Info, Check, Brain } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useSettings } from '../../context/SettingsContext';
 
@@ -8,7 +8,7 @@ interface EnhancedSettingsModalProps {
 }
 
 export default function EnhancedSettingsModal({ onClose }: EnhancedSettingsModalProps) {
-    const [activeTab, setActiveTab] = useState<'themes' | 'playback' | 'ui' | 'about'>('themes');
+    const [activeTab, setActiveTab] = useState<'themes' | 'playback' | 'ui' | 'ai' | 'about'>('themes');
     const { theme, setTheme, allThemes } = useTheme();
     const { settings, updateSettings, resetSettings } = useSettings();
 
@@ -16,6 +16,7 @@ export default function EnhancedSettingsModal({ onClose }: EnhancedSettingsModal
         { id: 'themes' as const, label: 'Themes', icon: Palette },
         { id: 'playback' as const, label: 'Playback', icon: Play },
         { id: 'ui' as const, label: 'UI', icon: Layout },
+        { id: 'ai' as const, label: 'AI', icon: Brain },
         { id: 'about' as const, label: 'About', icon: Info },
     ];
 
@@ -286,6 +287,46 @@ export default function EnhancedSettingsModal({ onClose }: EnhancedSettingsModal
                             </div>
                         </div>
                     )}
+
+                    {activeTab === 'ai' && (
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-xl font-semibold text-white mb-4">AI Features</h3>
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-white/5 rounded-lg border border-white/5">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <div className="p-2 bg-green-500/20 rounded-lg">
+                                                <Brain size={24} className="text-green-400" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-white font-medium">Local AI Processing</h4>
+                                                <p className="text-sm text-slate-400">Powered by OpenAI Whisper</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                            <p className="text-sm text-blue-200">
+                                                Subtitle generation is handled locally on your device. No API keys or cloud services required. Proivacy focused.
+                                            </p>
+                                        </div>
+
+                                        <div className="mt-4">
+                                            <h5 className="text-sm font-semibold text-white mb-2">Requirements</h5>
+                                            <div className="flex items-center gap-2 text-sm text-slate-400">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
+                                                <span>Python 3.8+ installed</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm text-slate-400 mt-1">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
+                                                <span><code>pip install openai-whisper</code></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
 
                     {activeTab === 'about' && (
                         <div className="space-y-6">

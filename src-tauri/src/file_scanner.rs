@@ -16,8 +16,11 @@ pub struct VideoEntry {
     created: u64,
 }
 
+use crate::config::save_last_folder_internal;
+
 #[command]
-pub fn list_videos(folder_path: String) -> Result<Vec<VideoEntry>, String> {
+pub fn list_videos(app: tauri::AppHandle, folder_path: String) -> Result<Vec<VideoEntry>, String> {
+    let _ = save_last_folder_internal(&app, folder_path.clone());
     let supported_extensions = ["mp4", "mkv", "avi", "mov", "webm", "flv", "wmv"];
     let mut videos = Vec::new();
 
