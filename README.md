@@ -2,6 +2,8 @@
 
 FrameX is a modern, high-performance media player built with Tauri, React, and Vite. It combines the power of Rust backend with a sleek React frontend to deliver a premium cinematic experience.
 
+![FrameX UI](ui.png)
+
 ## Features
 
 - **Modern UI**: Beautiful dark-themed interface with glassmorphism effects and smooth animations.
