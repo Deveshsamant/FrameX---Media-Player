@@ -12,11 +12,18 @@
 
 body {
   @apply text-foreground antialiased;
-  background-color: transparent;
+  background-color: #0f0f12;
   margin: 0;
   font-family: 'Inter', system-ui, sans-serif;
   overflow: hidden;
   /* App-like feel */
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
 }
 
 /* Custom Scrollbar */

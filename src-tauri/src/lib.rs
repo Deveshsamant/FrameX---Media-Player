@@ -9,6 +9,8 @@ mod file_scanner;
 mod thumbnail_generator;
 mod config;
 mod ai;
+mod metadata;
+mod watch_history;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -62,7 +64,18 @@ pub fn run() {
             config::get_last_folder,
             // AI
             ai::whisper::run_whisper,
-
+            // Metadata
+            metadata::fetch_metadata,
+            metadata::check_poster_exists,
+            metadata::read_poster,
+            metadata::fetch_movie_info,
+            metadata::fetch_folder_poster,
+            metadata::fetch_tv_info,
+            // Watch History
+            watch_history::save_watch_position,
+            watch_history::get_watch_position,
+            watch_history::get_watch_history,
+            watch_history::clear_watch_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,6 +1,6 @@
 use tauri::{AppHandle, Emitter};
 use std::process::Command;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(serde::Serialize, Clone)]
 pub struct WhisperProgress {
@@ -13,7 +13,7 @@ pub async fn run_whisper(
     app: AppHandle,
     video_path: String,
     model: Option<String>,
-    language: Option<String>,
+    _language: Option<String>,
 ) -> Result<String, String> {
     let video_path = PathBuf::from(&video_path);
     

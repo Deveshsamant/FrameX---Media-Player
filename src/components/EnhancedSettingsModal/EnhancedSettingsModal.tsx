@@ -1,21 +1,105 @@
 import { useState, useEffect } from 'react';
-import { X, Palette, Play, Layout, Info, Check, Brain } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { X, Palette, Play, Layout, Info, Check, Brain, Keyboard } from 'lucide-react';
+import KeyboardShortcutsEditor from '../KeyboardShortcutsEditor/KeyboardShortcutsEditor';
 import { useTheme } from '../../context/ThemeContext';
 import { useSettings } from '../../context/SettingsContext';
 
 interface EnhancedSettingsModalProps {
     onClose: () => void;
+    isPlayerActive: boolean;
 }
 
-export default function EnhancedSettingsModal({ onClose }: EnhancedSettingsModalProps) {
-    const [activeTab, setActiveTab] = useState<'themes' | 'playback' | 'ui' | 'ai' | 'about'>('themes');
+interface Track {
+    id: number;
+    type: string;
+    title?: string;
+    lang?: string;
+    selected: boolean;
+}
+
+export default function EnhancedSettingsModal({ onClose, isPlayerActive }: EnhancedSettingsModalProps) {
+    const [activeTab, setActiveTab] = useState<'themes' | 'playback' | 'ui' | 'shortcuts' | 'ai' | 'about'>(isPlayerActive ? 'playback' : 'themes');
     const { theme, setTheme, allThemes } = useTheme();
     const { settings, updateSettings, resetSettings } = useSettings();
+
+    // Playback State
+    const [tracks, setTracks] = useState<Track[]>([]);
+    const [subDelay, setSubDelay] = useState(0);
+    const [subScale, setSubScale] = useState(1.0);
+    const [speed, setSpeed] = useState(settings.defaultSpeed);
+    const [hwDec, setHwDec] = useState(settings.hardwareAcceleration);
+
+    useEffect(() => {
+        if (!isPlayerActive) return;
+
+        // Listen for tracks
+        const unlisten = listen<Track[]>('mpv-tracks', (e) => {
+            setTracks(e.payload);
+        });
+
+        // Fetch initial tracks
+        invoke('mpv_get_tracks');
+
+        return () => { unlisten.then(f => f()); };
+    }, [isPlayerActive]);
+
+    const handleSubTrack = (id: number | string) => {
+        invoke('mpv_set_subtitle', { sid: String(id) });
+        setTracks(prev => prev.map(t =>
+            t.type === 'sub' ? { ...t, selected: String(t.id) === String(id) } : t
+        ));
+    };
+
+    const handleAudioTrack = (id: number | string) => {
+        invoke('mpv_set_audio', { aid: String(id) });
+        setTracks(prev => prev.map(t =>
+            t.type === 'audio' ? { ...t, selected: String(t.id) === String(id) } : t
+        ));
+    };
+
+    const updateSubDelay = (val: number) => {
+        setSubDelay(val);
+        invoke('mpv_set_sub_delay', { delay: val });
+    };
+
+    const updateSubScale = (val: number) => {
+        setSubScale(val);
+        invoke('mpv_set_sub_scale', { scale: val });
+    };
+
+    const updateSpeed = (val: number) => {
+        setSpeed(val);
+        invoke('mpv_set_speed', { speed: val });
+    };
+
+    const updateAspectRatio = (ratio: string) => {
+        updateSettings({ aspectRatio: ratio });
+        invoke('mpv_set_aspect_ratio', { ratio });
+    };
+
+    const toggleHwDec = () => {
+        const newVal = !hwDec;
+        setHwDec(newVal);
+        updateSettings({ hardwareAcceleration: newVal });
+        invoke('mpv_set_hwdec', { enable: newVal });
+    };
+
+    const updateLoop = (mode: 'off' | 'one' | 'all') => {
+        updateSettings({ loopMode: mode });
+        invoke('mpv_set_loop', { mode });
+    }
+
+    const subTracks = tracks.filter(t => t.type === 'sub');
+    const audioTracks = tracks.filter(t => t.type === 'audio');
+
 
     const tabs = [
         { id: 'themes' as const, label: 'Themes', icon: Palette },
         { id: 'playback' as const, label: 'Playback', icon: Play },
         { id: 'ui' as const, label: 'UI', icon: Layout },
+        { id: 'shortcuts' as const, label: 'Shortcuts', icon: Keyboard },
         { id: 'ai' as const, label: 'AI', icon: Brain },
         { id: 'about' as const, label: 'About', icon: Info },
     ];
@@ -116,7 +200,125 @@ export default function EnhancedSettingsModal({ onClose }: EnhancedSettingsModal
                         <div className="space-y-6">
                             <div>
                                 <h3 className="text-xl font-semibold text-white mb-4">Playback Settings</h3>
+
+                                {isPlayerActive && (
+                                    <div className="space-y-6 mb-8 pb-8 border-b border-white/10">
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-white/50 mb-4">Current Media Controls</h4>
+
+                                        {/* Subtitles */}
+                                        <div className="space-y-3">
+                                            <h5 className="text-white font-medium">Subtitles</h5>
+                                            <div className="flex flex-col gap-1 max-h-40 overflow-y-auto pr-2 bg-white/5 rounded-lg p-2 custom-scrollbar">
+                                                <button
+                                                    onClick={() => handleSubTrack("no")}
+                                                    className={`flex items-center justify-between w-full p-2 rounded text-sm transition-colors ${!subTracks.some(t => t.selected) ? 'bg-violet-500/20 text-violet-300' : 'text-slate-300 hover:bg-white/10'}`}
+                                                >
+                                                    <span>Off</span>
+                                                    {!subTracks.some(t => t.selected) && <Check size={14} />}
+                                                </button>
+                                                {subTracks.map(t => (
+                                                    <button
+                                                        key={t.id}
+                                                        onClick={() => handleSubTrack(t.id)}
+                                                        className={`flex items-center justify-between w-full p-2 rounded text-sm transition-colors ${t.selected ? 'bg-violet-500/20 text-violet-300' : 'text-slate-300 hover:bg-white/10'}`}
+                                                    >
+                                                        <span className="truncate">{t.title || `Track ${t.id}`} ({t.lang || 'unk'})</span>
+                                                        {t.selected && <Check size={14} />}
+                                                    </button>
+                                                ))}
+                                                {subTracks.length === 0 && <div className="text-white/30 text-sm italic px-2">No subtitles found</div>}
+                                            </div>
+
+                                            {/* Subtitle Settings */}
+                                            <div className="grid grid-cols-2 gap-4 mt-2">
+                                                <div className="p-3 bg-white/5 rounded-lg">
+                                                    <div className="flex justify-between text-xs mb-2">
+                                                        <span className="text-slate-400">Delay</span>
+                                                        <span className="text-white">{subDelay > 0 ? '+' : ''}{subDelay.toFixed(1)}s</span>
+                                                    </div>
+                                                    <input
+                                                        type="range"
+                                                        min={-5} max={5} step={0.1} value={subDelay}
+                                                        onChange={(e) => updateSubDelay(parseFloat(e.target.value))}
+                                                        className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-violet-500"
+                                                    />
+                                                </div>
+                                                <div className="p-3 bg-white/5 rounded-lg">
+                                                    <div className="flex justify-between text-xs mb-2">
+                                                        <span className="text-slate-400">Size</span>
+                                                        <span className="text-white">{(subScale * 100).toFixed(0)}%</span>
+                                                    </div>
+                                                    <input
+                                                        type="range"
+                                                        min={0.5} max={2.0} step={0.1} value={subScale}
+                                                        onChange={(e) => updateSubScale(parseFloat(e.target.value))}
+                                                        className="w-full h-1 bg-white/20 rounded-full appearance-none cursor-pointer accent-violet-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Audio Tracks */}
+                                        <div className="space-y-3">
+                                            <h5 className="text-white font-medium">Audio Track</h5>
+                                            <div className="flex flex-col gap-1 max-h-40 overflow-y-auto pr-2 bg-white/5 rounded-lg p-2 custom-scrollbar">
+                                                {audioTracks.map(t => (
+                                                    <button
+                                                        key={t.id}
+                                                        onClick={() => handleAudioTrack(t.id)}
+                                                        className={`flex items-center justify-between w-full p-2 rounded text-sm transition-colors ${t.selected ? 'bg-violet-500/20 text-violet-300' : 'text-slate-300 hover:bg-white/10'}`}
+                                                    >
+                                                        <span className="truncate">{t.title || `Track ${t.id}`} ({t.lang || 'unk'})</span>
+                                                        {t.selected && <Check size={14} />}
+                                                    </button>
+                                                ))}
+                                                {audioTracks.length === 0 && <div className="text-white/30 text-sm italic px-2">No audio tracks found</div>}
+                                            </div>
+                                        </div>
+
+                                        {/* Speed & Aspect Ratio */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="p-4 bg-white/5 rounded-lg">
+                                                <h5 className="text-white font-medium mb-3">Playback Speed ({speed}x)</h5>
+                                                <input
+                                                    type="range"
+                                                    min={0.25} max={5.0} step={0.25} value={speed}
+                                                    onChange={(e) => updateSpeed(parseFloat(e.target.value))}
+                                                    className="w-full h-2 bg-white/20 rounded-full appearance-none cursor-pointer accent-violet-500"
+                                                />
+                                            </div>
+                                            <div className="p-4 bg-white/5 rounded-lg">
+                                                <h5 className="text-white font-medium mb-3">Aspect Ratio</h5>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {['-1', '16:9', '4:3', '2.35:1'].map((ratio) => (
+                                                        <button
+                                                            key={ratio}
+                                                            onClick={() => updateAspectRatio(ratio)}
+                                                            className={`px-2 py-1.5 rounded text-xs transition-colors ${settings.aspectRatio === ratio ? 'bg-violet-500 text-white' : 'bg-white/10 text-slate-300 hover:bg-white/20'}`}
+                                                        >
+                                                            {ratio === '-1' ? 'Auto' : ratio}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Hardware Acceleration */}
+                                        <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+                                            <span className="text-white font-medium">Hardware Acceleration</span>
+                                            <button
+                                                onClick={toggleHwDec}
+                                                className={`w-12 h-6 rounded-full transition-colors relative ${hwDec ? 'bg-violet-600' : 'bg-white/10'}`}
+                                            >
+                                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${hwDec ? 'left-7' : 'left-1'}`} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="space-y-4">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-white/50 mb-4">Default Settings</h4>
+
                                     {/* Default Volume */}
                                     <div className="p-4 bg-white/5 rounded-lg border border-white/5">
                                         <div className="flex items-center justify-between mb-2">
@@ -134,6 +336,25 @@ export default function EnhancedSettingsModal({ onClose }: EnhancedSettingsModal
                                                 background: `linear-gradient(to right, ${theme.colors.primary} 0%, ${theme.colors.primary} ${settings.defaultVolume}%, rgba(255,255,255,0.1) ${settings.defaultVolume}%, rgba(255,255,255,0.1) 100%)`,
                                             }}
                                         />
+                                    </div>
+
+                                    {/* Loop Mode */}
+                                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/5">
+                                        <div>
+                                            <p className="text-white font-medium">Loop Mode</p>
+                                            <p className="text-sm text-slate-400">Repeat playback behavior</p>
+                                        </div>
+                                        <div className="flex bg-black/20 rounded-lg p-1 gap-1">
+                                            {(['off', 'one', 'all'] as const).map((mode) => (
+                                                <button
+                                                    key={mode}
+                                                    onClick={() => updateLoop(mode)}
+                                                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${settings.loopMode === mode ? 'bg-violet-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                                                >
+                                                    {mode === 'off' ? 'Off' : mode === 'one' ? 'Single' : 'All'}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
 
                                     {/* Auto Play */}
@@ -200,9 +421,7 @@ export default function EnhancedSettingsModal({ onClose }: EnhancedSettingsModal
                                 </div>
                             </div>
                         </div>
-                    )}
-
-                    {activeTab === 'ui' && (
+                    )}        {activeTab === 'ui' && (
                         <div className="space-y-6">
                             <div>
                                 <h3 className="text-xl font-semibold text-white mb-4">UI Preferences</h3>
@@ -284,6 +503,16 @@ export default function EnhancedSettingsModal({ onClose }: EnhancedSettingsModal
                                         </select>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'shortcuts' && (
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-xl font-semibold text-white mb-4">Keyboard Shortcuts</h3>
+                                <p className="text-sm text-slate-400 mb-4">Click on a key binding, then press the new key to remap it.</p>
+                                <KeyboardShortcutsEditor />
                             </div>
                         </div>
                     )}

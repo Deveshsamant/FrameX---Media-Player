@@ -5,11 +5,16 @@ FrameX is a modern, high-performance media player built with Tauri, React, and V
 ## Features
 
 - **Modern UI**: Beautiful dark-themed interface with glassmorphism effects and smooth animations.
+- **Cinematic Info Modal**: View detailed movie/TV info with stunning full-screen backdrops.
 - **High Performance**: Native performance powered by Tauri and Rust.
 - **Media Playback**: Professional-grade playback engine based on `libmpv`.
 - **AI Subtitles**: Generate English subtitles locally using OpenAI Whisper (privacy-focused, no cloud keys required).
-- **Smart Library**: Auto-detects media files, remembers playback positions, and supports folder navigation.
-- **Customizable**: extensive settings for playback, themes, and UI preferences.
+- **Smart Library**: 
+    - Auto-detects media files, remembers playback positions.
+    - **Selective Thumbnails**: Automatically generates thumbnails for all videos (including personal recordings) using FFmpeg.
+    - **Smart Poster Fetching**: Fetches high-quality posters from TMDB only for "Movies" and "Anime" folders to keep your library organized.
+- **Folder Navigation**: Browse your media collection with ease, supporting nested folders and intuitive navigation.
+- **Customizable**: Extensive settings for playback, themes, shortcuts, and UI preferences.
 
 ## Prerequisites
 

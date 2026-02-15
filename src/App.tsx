@@ -7,11 +7,11 @@ import {
   Play, Pause, Settings, FolderOpen, Volume2, SkipBack, SkipForward,
   Maximize2, Minimize2, Film, MonitorPlay, Library, Grid, List,
   X, Minus, Square, Copy, ArrowLeft, Captions, Check, ArrowUpDown, Clock,
-  FileText, Calendar as CalendarIcon, Brain
+  FileText, Info, Calendar as CalendarIcon, Brain
 } from "lucide-react";
 import { useFile } from "./context/FileContext";
 import { useGestures } from "./hooks/useGestures";
-import SettingsModal from "./components/SettingsModal/SettingsModal";
+
 import HomeScreen from "./pages/HomeScreen";
 import EnhancedSettingsModal from "./components/EnhancedSettingsModal/EnhancedSettingsModal";
 import TimelinePreview from "./components/TimelinePreview";
@@ -32,6 +32,206 @@ interface VideoEntry {
   size: number;
   modified: number;
   created: number;
+  entry_type: 'video' | 'folder';
+  poster_path?: string;
+}
+
+interface MovieInfo {
+  title: string;
+  overview: string;
+  release_date: string;
+  vote_average: number;
+  vote_count: number;
+  runtime: number;
+  genres: string[];
+  original_language: string;
+  tagline: string;
+  status: string;
+  budget: number;
+  revenue: number;
+}
+
+interface TvInfo {
+  title: string;
+  overview: string;
+  first_air_date: string;
+  last_air_date: string;
+  vote_average: number;
+  vote_count: number;
+  number_of_seasons: number;
+  number_of_episodes: number;
+  episode_runtime: number;
+  genres: string[];
+  original_language: string;
+  tagline: string;
+  status: string;
+}
+
+function MovieInfoModal({ info, posterSrc, onClose }: { info: MovieInfo, posterSrc?: string, onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in p-4" onClick={onClose}>
+      <div
+        className="relative bg-slate-900/50 border border-white/10 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col md:flex-row animate-scale-in"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Backdrop Image (Blurred Poster) */}
+        {posterSrc && (
+          <div className="absolute inset-0 z-0">
+            <img src={posterSrc} alt="" className="w-full h-full object-cover opacity-30 blur-xl scale-110" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent" />
+          </div>
+        )}
+
+        {/* Poster Column (Left) */}
+        <div className="relative z-10 hidden md:block w-1/3 shrink-0 p-6">
+          {posterSrc ? (
+            <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/50 border border-white/10">
+              <img src={posterSrc} alt={info.title} className="w-full h-auto object-cover aspect-[2/3]" />
+            </div>
+          ) : (
+            <div className="w-full aspect-[2/3] bg-white/5 rounded-xl flex items-center justify-center">
+              <Film size={48} className="text-white/20" />
+            </div>
+          )}
+        </div>
+
+        {/* Content Column (Right) */}
+        <div className="relative z-10 flex-1 p-8 overflow-y-auto custom-scrollbar">
+          <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-white/20 rounded-full text-white transition-colors z-20">
+            <X size={24} />
+          </button>
+
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-4xl md:text-5xl font-bold text-white shadow-black drop-shadow-lg leading-tight">{info.title}</h2>
+              {info.tagline && <p className="text-violet-200 text-lg italic mt-2 opacity-90 font-medium">"{info.tagline}"</p>}
+
+              <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-300 mt-4">
+                <span className="bg-white/10 px-3 py-1 rounded-full border border-white/10 text-white shadow-sm">{info.release_date.split('-')[0]}</span>
+                <span className="flex items-center gap-1 bg-yellow-500/20 px-3 py-1 rounded-full border border-yellow-500/30 text-yellow-300">
+                  <span className="text-xs">★</span> {info.vote_average.toFixed(1)}
+                </span>
+                <span>{Math.floor(info.runtime / 60)}h {info.runtime % 60}m</span>
+                <span className="uppercase tracking-wider opacity-70">{info.status}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {info.genres.map(g => (
+                <span key={g} className="px-3 py-1 bg-violet-600/30 hover:bg-violet-600/50 rounded-full text-xs text-white border border-violet-500/30 transition-colors cursor-default">
+                  {g}
+                </span>
+              ))}
+            </div>
+
+            <div>
+              <h3 className="text-sm font-bold text-white/50 uppercase tracking-widest mb-3">Overview</h3>
+              <p className="text-slate-200 leading-relaxed text-lg font-light">{info.overview}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+              <div>
+                <dt className="text-xs text-slate-400 uppercase">Budget</dt>
+                <dd className="text-slate-200 font-medium">${(info.budget / 1000000).toFixed(1)}M</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-400 uppercase">Revenue</dt>
+                <dd className="text-slate-200 font-medium">${(info.revenue / 1000000).toFixed(1)}M</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-400 uppercase">Original Language</dt>
+                <dd className="text-slate-200 font-medium uppercase">{info.original_language}</dd>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TvInfoModal({ info, posterSrc, onClose }: { info: TvInfo, posterSrc?: string, onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in p-4" onClick={onClose}>
+      <div
+        className="relative bg-slate-900/50 border border-white/10 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col md:flex-row animate-scale-in"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Backdrop Image (Blurred Poster) */}
+        {posterSrc && (
+          <div className="absolute inset-0 z-0">
+            <img src={posterSrc} alt="" className="w-full h-full object-cover opacity-30 blur-xl scale-110" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent" />
+          </div>
+        )}
+
+        {/* Poster Column (Left) */}
+        <div className="relative z-10 hidden md:block w-1/3 shrink-0 p-6">
+          {posterSrc ? (
+            <div className="rounded-xl overflow-hidden shadow-2xl shadow-black/50 border border-white/10">
+              <img src={posterSrc} alt={info.title} className="w-full h-auto object-cover aspect-[2/3]" />
+            </div>
+          ) : (
+            <div className="w-full aspect-[2/3] bg-white/5 rounded-xl flex items-center justify-center">
+              <FolderOpen size={48} className="text-white/20" />
+            </div>
+          )}
+        </div>
+
+        {/* Content Column (Right) */}
+        <div className="relative z-10 flex-1 p-8 overflow-y-auto custom-scrollbar">
+          <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-white/20 rounded-full text-white transition-colors z-20">
+            <X size={24} />
+          </button>
+
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-4xl md:text-5xl font-bold text-white shadow-black drop-shadow-lg leading-tight">{info.title}</h2>
+              {info.tagline && <p className="text-blue-200 text-lg italic mt-2 opacity-90 font-medium">"{info.tagline}"</p>}
+
+              <div className="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-300 mt-4">
+                <span className="bg-white/10 px-3 py-1 rounded-full border border-white/10 text-white shadow-sm">{info.first_air_date.split('-')[0]}</span>
+                <span className="flex items-center gap-1 bg-yellow-500/20 px-3 py-1 rounded-full border border-yellow-500/30 text-yellow-300">
+                  <span className="text-xs">★</span> {info.vote_average.toFixed(1)}
+                </span>
+                <span>{info.number_of_seasons} Seasons</span>
+                <span>{info.number_of_episodes} Episodes</span>
+                <span className="uppercase tracking-wider opacity-70">{info.status}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {info.genres.map(g => (
+                <span key={g} className="px-3 py-1 bg-blue-600/30 hover:bg-blue-600/50 rounded-full text-xs text-white border border-blue-500/30 transition-colors cursor-default">
+                  {g}
+                </span>
+              ))}
+            </div>
+
+            <div>
+              <h3 className="text-sm font-bold text-white/50 uppercase tracking-widest mb-3">Overview</h3>
+              <p className="text-slate-200 leading-relaxed text-lg font-light">{info.overview}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+              <div>
+                <dt className="text-xs text-slate-400 uppercase">Episode Runtime</dt>
+                <dd className="text-slate-200 font-medium">{info.episode_runtime} min</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-400 uppercase">Last Air Date</dt>
+                <dd className="text-slate-200 font-medium">{info.last_air_date}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-400 uppercase">Original Language</dt>
+                <dd className="text-slate-200 font-medium uppercase">{info.original_language}</dd>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 type SortOption = 'name-asc' | 'name-desc' | 'size-asc' | 'size-desc' | 'duration-asc' | 'duration-desc' | 'date-asc' | 'date-desc';
@@ -103,6 +303,11 @@ function App() {
 
   // Window State
   const [isMaximized, setIsMaximized] = useState(false);
+
+  // Info Modal State
+  const [currentInfo, setCurrentInfo] = useState<MovieInfo | TvInfo | null>(null);
+  const [infoModalType, setInfoModalType] = useState<'movie' | 'tv' | null>(null);
+  const [currentPoster, setCurrentPoster] = useState<string | null>(null);
 
   useEffect(() => {
     const updateMaximizedState = async () => {
@@ -319,6 +524,26 @@ function App() {
     }
   }
 
+  async function handleInfo(entry: VideoEntry) {
+    // Store poster logic
+    const poster = posterCache[entry.path];
+    setCurrentPoster(poster || null);
+
+    try {
+      if (entry.entry_type === 'folder') {
+        const info = await invoke<TvInfo>('fetch_tv_info', { folderPath: entry.path });
+        setCurrentInfo(info);
+        setInfoModalType('tv');
+      } else {
+        const info = await invoke<MovieInfo>('fetch_movie_info', { videoPath: entry.path });
+        setCurrentInfo(info);
+        setInfoModalType('movie');
+      }
+    } catch (e) {
+      console.error("Failed to fetch info:", e);
+    }
+  }
+
   async function handleOpenFolder() {
     try {
       const selected = await open({
@@ -487,6 +712,41 @@ function App() {
   // Parent-level thumbnail cache (persists across child re-renders)
   const [thumbnailCache, setThumbnailCache] = useState<Record<string, string>>({});
   const [previewCache, setPreviewCache] = useState<Record<string, string>>({});
+  const [posterCache, setPosterCache] = useState<Record<string, string>>({});
+
+  // Load posters for library entries (and handle folders correctly)
+  useEffect(() => {
+    if (library.length === 0) return;
+    library.forEach(async (entry) => {
+      if (posterCache[entry.path]) return;
+      try {
+        // Check if poster already exists on disk
+        const posterPath = await invoke<string | null>('check_poster_exists', { videoPath: entry.path });
+        if (posterPath) {
+          const dataUrl = await invoke<string>('read_poster', { posterPath });
+          setPosterCache(prev => ({ ...prev, [entry.path]: dataUrl }));
+        } else {
+          // Fetching
+          if (entry.entry_type === 'folder') {
+            // User Request: "subfolder under anime folder"
+            if (entry.path.toLowerCase().includes('anime')) {
+              const fetched = await invoke<string | null>('fetch_folder_poster', { folderPath: entry.path });
+              if (fetched) {
+                const dataUrl = await invoke<string>('read_poster', { posterPath: fetched });
+                setPosterCache(prev => ({ ...prev, [entry.path]: dataUrl }));
+              }
+            }
+          }
+          // User Request: "dont extract thumbnail posters for any of files"
+          // We removed the else block that fetched metadata for videos.
+          // Videos will now only use local .poster.jpg (if exists) or generated thumbnails.
+        }
+      } catch (e) {
+        // Silently fail - poster is optional
+        console.debug('Poster not available for', entry.path, e);
+      }
+    });
+  }, [library]);
 
   // Process Queue Effect
   useEffect(() => {
@@ -571,7 +831,7 @@ function App() {
         <header data-tauri-drag-region className="relative z-50 h-16 flex items-center justify-between px-6 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 select-none">
           <div className="flex items-center gap-3 group cursor-default pointer-events-none">
             {/* Logo and Title */}
-            <img src="/framex-icon.png" alt="Logo" className="w-9 h-9 object-contain opacity-90 drop-shadow-md" />
+            <img src="/framex-icon.png" alt="Logo" className="object-contain opacity-90 drop-shadow-md" style={{ width: '36px', height: '36px', maxWidth: '36px', maxHeight: '36px' }} />
             <span className="text-xl font-bold text-slate-200 tracking-tight">Frame<span className="text-violet-400">X</span></span>
           </div>
 
@@ -618,9 +878,9 @@ function App() {
 
       {/* Main Content (Hidden when playing) */}
       {!isPlayerActive && (
-        <main className="relative z-10 flex-1 flex flex-col p-6 perspective-[1000px] overflow-hidden">
+        <main className="relative z-10 flex-1 flex flex-col overflow-hidden">
           {library.length > 0 ? (
-            <div className="h-full flex flex-col">
+            <div className="h-full flex flex-col p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white flex items-center gap-3">
                   <button
@@ -713,6 +973,7 @@ function App() {
                       entry={entry}
                       viewMode={viewMode}
                       onPlay={() => handlePlay(entry.path)}
+                      onOpen={() => loadFolder(entry.path)}
                       addToQueue={addToQueue}
                       removeFromProcessing={removeFromProcessing}
                       shouldLoad={processing.includes(entry.path)}
@@ -720,7 +981,9 @@ function App() {
                       setThumbnailCache={setThumbnailCache}
                       previewCache={previewCache}
                       setPreviewCache={setPreviewCache}
+                      posterSrc={posterCache[entry.path]}
                       duration={durationCache[entry.path]}
+                      onInfo={() => handleInfo(entry)}
                     />
                   ))}
                 </div>
@@ -1014,20 +1277,31 @@ function App() {
         </footer>
       )}
 
-      {/* Settings Modal */}
-      {showSettings && (
-        <SettingsModal
-          onClose={() => setShowSettings(false)}
-          autoHideDuration={autoHideDuration}
-          setAutoHideDuration={setAutoHideDuration}
-          loopMode={loopMode}
-          setLoopMode={setLoopMode}
-        />
-      )}
+      {/* Settings Modal - merged into EnhancedSettingsModal */}
 
       {/* App Settings Modal */}
       {showAppSettings && (
-        <EnhancedSettingsModal onClose={() => setShowAppSettings(false)} />
+        <EnhancedSettingsModal
+          onClose={() => setShowAppSettings(false)}
+          isPlayerActive={isPlayerActive}
+        />
+      )}
+
+      {/* Info Modals */}
+      {/* Info Modals */}
+      {currentInfo && infoModalType === 'movie' && (
+        <MovieInfoModal
+          info={currentInfo as MovieInfo}
+          posterSrc={currentPoster || undefined}
+          onClose={() => { setCurrentInfo(null); setInfoModalType(null); setCurrentPoster(null); }}
+        />
+      )}
+      {currentInfo && infoModalType === 'tv' && (
+        <TvInfoModal
+          info={currentInfo as TvInfo}
+          posterSrc={currentPoster || undefined}
+          onClose={() => { setCurrentInfo(null); setInfoModalType(null); setCurrentPoster(null); }}
+        />
       )}
     </div>
   );
@@ -1071,11 +1345,12 @@ function TiltCard({ children, className }: { children: React.ReactNode, classNam
 }
 
 // Thumbnail Card Component with async loading
-function ThumbnailCard({ path, entry, viewMode, onPlay, addToQueue, removeFromProcessing, shouldLoad, thumbnailCache, setThumbnailCache, previewCache, setPreviewCache, duration }: {
+function ThumbnailCard({ path, entry, viewMode, onPlay, onOpen, addToQueue, removeFromProcessing, shouldLoad, thumbnailCache, setThumbnailCache, previewCache, setPreviewCache, posterSrc, duration, onInfo }: {
   path: string,
   entry: VideoEntry,
   viewMode: 'grid' | 'list',
   onPlay: () => void,
+  onOpen: () => void,
   addToQueue: (path: string) => void,
   removeFromProcessing: (path: string) => void,
   shouldLoad: boolean,
@@ -1083,7 +1358,9 @@ function ThumbnailCard({ path, entry, viewMode, onPlay, addToQueue, removeFromPr
   setThumbnailCache: React.Dispatch<React.SetStateAction<Record<string, string>>>,
   previewCache: Record<string, string>,
   setPreviewCache: React.Dispatch<React.SetStateAction<Record<string, string>>>,
-  duration?: number
+  posterSrc?: string,
+  duration?: number,
+  onInfo: () => void
 }) {
   // Use cached thumbnail if available
   const thumb = thumbnailCache[path] || null;
@@ -1093,12 +1370,21 @@ function ThumbnailCard({ path, entry, viewMode, onPlay, addToQueue, removeFromPr
   const [previewError, setPreviewError] = useState(false); // Track preview load errors
   const hoverTimeoutRef = useRef<number | null>(null);
 
+  const isFolder = entry.entry_type === 'folder';
+
+  // Create checks at top level for reuse
+  const isMoviesVideo = !isFolder && path.toLowerCase().includes('movies');
+  // User Request: "only the subfolders inside anime folder is to be portrait"
+  const isAnimeFolder = isFolder && path.toLowerCase().includes('anime');
+  // User Request: "give the i button only for videos inside movies folder and only for subfolders inside anime folder"
+  const showInfo = isMoviesVideo || isAnimeFolder;
+
   useEffect(() => {
-    // Add to queue on mount (only if not already cached)
-    if (!thumbnailCache[path]) {
+    // Add to queue on mount (only if not already cached and not a folder)
+    if (!isFolder && !thumbnailCache[path]) {
       addToQueue(path);
     }
-  }, [path, addToQueue, thumbnailCache]);
+  }, [path, addToQueue, thumbnailCache, isFolder]);
 
   // Reset error when path changes
   useEffect(() => {
@@ -1106,7 +1392,8 @@ function ThumbnailCard({ path, entry, viewMode, onPlay, addToQueue, removeFromPr
   }, [path]);
 
   useEffect(() => {
-    if (shouldLoad && !hasRequested && !thumb) {
+    // Generate thumbnails for all videos (as per user request: "use thumbnail from the video")
+    if (shouldLoad && !hasRequested && !thumb && !isFolder) {
       setHasRequested(true);
 
       async function loadThumb() {
@@ -1122,7 +1409,7 @@ function ThumbnailCard({ path, entry, viewMode, onPlay, addToQueue, removeFromPr
       }
       loadThumb();
     }
-  }, [shouldLoad, hasRequested, thumb, path, removeFromProcessing, setThumbnailCache]);
+  }, [shouldLoad, hasRequested, thumb, path, removeFromProcessing, setThumbnailCache, isFolder]);
 
   // Handle hover preview loading
   useEffect(() => {
@@ -1149,64 +1436,68 @@ function ThumbnailCard({ path, entry, viewMode, onPlay, addToQueue, removeFromPr
     };
   }, [isHovered, preview, previewError, path, setPreviewCache]);
 
+  // Determine aspect ratio class based on whether it is a poster or thumbnail
+  // If we have a poster, use portrait (aspect-[2/3]), otherwise use landscape (aspect-video)
+  // EXCEPT if it's a folder, folders with posters are also portrait.
+  const aspectRatioClass = (posterSrc || isAnimeFolder) ? 'aspect-[2/3]' : 'aspect-video';
+
   return (
     <div
-      onDoubleClick={onPlay}
+      onDoubleClick={isFolder ? onOpen : onPlay}
+      onClick={isFolder ? onOpen : undefined}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`group relative bg-white/5 hover:bg-white/10 border border-white/5 hover:border-violet-500/50 rounded-xl overflow-hidden transition-all duration-300 cursor-pointer ${viewMode === 'list' ? 'flex items-center gap-4 p-4' : 'aspect-video flex flex-col'}`}
+      className={`group relative bg-white/5 hover:bg-white/10 border border-white/5 hover:border-violet-500/50 rounded-xl overflow-hidden transition-all duration-300 cursor-pointer ${viewMode === 'list' ? 'flex items-center gap-4 p-4' : `${aspectRatioClass} flex flex-col`}`}
     >
       <div className={`${viewMode === 'list' ? 'w-24 h-16 shrink-0' : 'flex-1'} relative flex items-center justify-center bg-black/40 group-hover:bg-violet-500/20 transition-colors overflow-hidden`}>
-        {isHovered && preview && !previewError ? (
+        {isHovered && preview && !previewError && !isFolder ? (
           <img
             src={preview}
             alt=""
             className="absolute inset-0 w-full h-full object-cover animate-fade-in"
             onError={() => setPreviewError(true)}
           />
+        ) : posterSrc ? (
+          <img src={posterSrc} alt="" className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300" />
         ) : thumb ? (
           <img src={thumb} alt="" className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300" />
         ) : (
-          <Film className={`text-slate-600 group-hover:text-violet-400 transition-colors ${viewMode === 'list' ? 'w-6 h-6' : 'w-10 h-10'} ${shouldLoad ? 'animate-pulse' : ''}`} />
+          isFolder ?
+            <FolderOpen className={`text-slate-600 group-hover:text-violet-400 transition-colors ${viewMode === 'list' ? 'w-6 h-6' : 'w-16 h-16'}`} /> :
+            <Film className={`text-slate-600 group-hover:text-violet-400 transition-colors ${viewMode === 'list' ? 'w-6 h-6' : 'w-10 h-10'} ${shouldLoad ? 'animate-pulse' : ''}`} />
         )}
 
-        {/* Hover Overlay with Play Button - Only show if not previewing (or keep it?) */}
-        {/* If preview is playing, maybe hide the play button overlay to let user see preview? Or keep it for clarity? User said "preview of video". Usually preview replaces static thumb but overlay remains. */}
+        {/* Info Button - Top Right */}
+        {showInfo && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onInfo(); }}
+            className={`absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-violet-600 rounded-full text-white backdrop-blur-sm transition-all duration-200 z-20 ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'}`}
+            title="View Info"
+          >
+            <Info size={20} />
+          </button>
+        )}
+
+        {/* Hover Overlay with Play/Open Button */}
         <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-300 bg-gradient-to-t from-black/80 via-black/50 to-black/30 z-10 ${isHovered && !preview ? 'opacity-100' : 'opacity-0'}`}>
           <button
-            onClick={(e) => { e.stopPropagation(); onPlay(); }}
+            onClick={(e) => { e.stopPropagation(); isFolder ? onOpen() : onPlay(); }}
             className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-lg shadow-lg shadow-violet-500/30 transform hover:scale-105 active:scale-95 transition-all duration-200"
           >
-            <Play size={18} fill="currentColor" />
-            <span>Play Video</span>
+            {isFolder ? <FolderOpen size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+            <span>{isFolder ? 'Open Folder' : 'Play Video'}</span>
           </button>
         </div>
-
-        {/* If preview IS showing, we might want a small indicator or just let it play. 
-            The gradient overlay might obscure the preview. Let's make it more transparent or auto-hide after a while?
-            For now, let's keep it simple: Show preview instead of thumb. The play button overlay is nice but blocks view.
-            I used `opacity-0` above when preview is active? 
-            Actually, the user wants PREVIEW.
-            If I make overlay disappear when preview is ready, user can see the video.
-            I changed the condition above: `${isHovered && !preview ? 'opacity-100' : 'opacity-0'}`
-            Wait, if preview loads, `preview` is truthy, so `!preview` is false -> opacity-0.
-            But `isHovered` is true.
-            So when preview loads, the play button disappears? That might be confusing.
-            Maybe keep the play button but make it smaller or less intrusive?
-            Or maybe show it only on hover but if preview plays, just show a small play icon in corner?
-            Let's stick to standard behavior: Preview plays, but controls/overlay are minimal.
-            I'll just let the play button hide when preview starts so user can see content.
-        */}
       </div>
       <div className={`p-3 ${viewMode === 'list' ? 'flex-1 min-w-0' : 'relative z-20 bg-gradient-to-t from-black/80 to-transparent -mt-12 pt-8 pointer-events-none'}`}>
         <p className="text-sm font-medium text-slate-200 truncate group-hover:text-white transition-colors drop-shadow-md">
-          {path.split(/[\\/]/).pop()}
+          {entry.name}
         </p>
         <p className="text-xs text-slate-500 truncate mt-0.5 flex items-center justify-between">
-          <span className={viewMode !== 'list' ? 'hidden' : ''}>{path}</span>
+          <span className={viewMode !== 'list' ? 'hidden' : ''}>{path.split(/[\\/]/).pop()}</span>
           <span className="flex items-center gap-2">
-            <span>{(entry.size / (1024 * 1024)).toFixed(1)} MB</span>
-            {duration && <span>{Math.floor(duration / 60)}:{Math.floor(duration % 60).toString().padStart(2, '0')}</span>}
+            {!isFolder && <span>{(entry.size / (1024 * 1024)).toFixed(1)} MB</span>}
+            {!isFolder && duration && <span>{Math.floor(duration / 60)}:{Math.floor(duration % 60).toString().padStart(2, '0')}</span>}
           </span>
         </p>
       </div>

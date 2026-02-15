@@ -24,3 +24,7 @@ dist-ssr
 
 # Tauri
 src-tauri/target
+
+# FrameX generated
+thumbnails/
+src/output.css
