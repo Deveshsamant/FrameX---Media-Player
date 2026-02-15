@@ -145,6 +145,9 @@ fn ensure_mpv_running(state: &State<'_, MpvState>, wid: Option<i64>, app_handle:
         // Core settings
         let _ = mpv.set_property("input-default-bindings", true);
         let _ = mpv.set_property("vo", "gpu");
+        let _ = mpv.set_property("hwdec", "auto"); // Enable HW decoding by default
+        let _ = mpv.set_property("log-file", "mpv_debug.log"); // Enable logging
+        let _ = mpv.set_property("msg-level", "all=warn"); // Set log level
         if let Some(w) = wid {
             let _ = mpv.set_property("wid", w);
         }
