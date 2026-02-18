@@ -1,4 +1,4 @@
-import { FolderOpen, Library, Film, MonitorPlay, Sparkles } from 'lucide-react';
+import { FolderOpen, Library, Film, MonitorPlay, Sparkles, Globe } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTheme } from '../context/ThemeContext';
 
@@ -47,9 +47,10 @@ function TiltCard({ children, className, style }: TiltCardProps) {
 interface HomeScreenProps {
     onOpenFile: () => void;
     onOpenFolder: () => void;
+    onOpenStream?: () => void;
 }
 
-export default function HomeScreen({ onOpenFile, onOpenFolder }: HomeScreenProps) {
+export default function HomeScreen({ onOpenFile, onOpenFolder, onOpenStream }: HomeScreenProps) {
     const { theme } = useTheme();
     return (
         <div className="h-full overflow-y-auto">
@@ -118,6 +119,32 @@ export default function HomeScreen({ onOpenFile, onOpenFolder }: HomeScreenProps
                                 <Library size={24} /> Open Folder
                             </button>
                         </div>
+
+                        {/* Stream CTA */}
+                        {onOpenStream && (
+                            <div className="pt-3 flex justify-center animate-fade-in-up delay-300">
+                                <button
+                                    onClick={onOpenStream}
+                                    className="px-6 py-3 backdrop-blur-xl rounded-xl font-medium text-white text-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-2 shadow-lg"
+                                    style={{
+                                        backgroundColor: `${theme.colors.cardBg}60`,
+                                        borderWidth: '1px',
+                                        borderStyle: 'solid',
+                                        borderColor: `${theme.colors.border}80`,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.borderColor = theme.colors.borderHover;
+                                        e.currentTarget.style.backgroundColor = `${theme.colors.cardBg}cc`;
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.borderColor = `${theme.colors.border}80`;
+                                        e.currentTarget.style.backgroundColor = `${theme.colors.cardBg}60`;
+                                    }}
+                                >
+                                    <Globe size={18} /> Open Stream
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Feature Cards Grid */}

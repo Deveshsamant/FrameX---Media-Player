@@ -17,6 +17,8 @@ import EnhancedSettingsModal from "./components/EnhancedSettingsModal/EnhancedSe
 import TimelinePreview from "./components/TimelinePreview";
 import { useSettings } from "./context/SettingsContext";
 import { AISidebar } from "./components/AISidebar/AISidebar";
+import StreamDialog from "./components/StreamDialog/StreamDialog";
+import PlaylistManager from "./components/PlaylistManager/PlaylistManager";
 
 interface Track {
   id: number;
@@ -256,33 +258,16 @@ function App() {
   const [previewX, setPreviewX] = useState(0);
 
   // Player Settings State
-  const [showSettings, setShowSettings] = useState(false);
-  const [autoHideDuration, setAutoHideDuration] = useState(1000); // Default 1s
-  const [loopMode, setLoopMode] = useState("off");
+  const [autoHideDuration] = useState(1000); // Default 1s
+
 
   // App Settings State
   // App Settings State
   const [showAppSettings, setShowAppSettings] = useState(false);
   const [showAISidebar, setShowAISidebar] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+  const [showStreamDialog, setShowStreamDialog] = useState(false);
+  const [showPlaylistManager, setShowPlaylistManager] = useState(false);
 
-  useEffect(() => {
-    const key = localStorage.getItem('gemini_api_key');
-    if (key) setApiKey(key);
-
-    // Listen for storage updates (in case settings change it)
-    const handleStorageChange = () => {
-      const newKey = localStorage.getItem('gemini_api_key');
-      if (newKey) setApiKey(newKey);
-    };
-    window.addEventListener('storage', handleStorageChange);
-    // Custom event for same-window updates
-    window.addEventListener('api-key-updated', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('api-key-updated', handleStorageChange);
-    };
-  }, []);
 
   // Playback Speed State
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
@@ -1032,10 +1017,33 @@ function App() {
               </button>
             </div>
           ) : (
-            <HomeScreen onOpenFile={handleOpenFile} onOpenFolder={handleOpenFolder} />
+            <HomeScreen onOpenFile={handleOpenFile} onOpenFolder={handleOpenFolder} onOpenStream={() => setShowStreamDialog(true)} />
           )}
         </main>
       )}
+
+      {/* Stream Dialog */}
+      <StreamDialog
+        isOpen={showStreamDialog}
+        onClose={() => setShowStreamDialog(false)}
+        onPlay={(url) => {
+          setShowStreamDialog(false);
+          setFile(url);
+          invoke('mpv_load_url', { url });
+          setIsPlayerActive(true);
+        }}
+      />
+
+      {/* Playlist Manager */}
+      <PlaylistManager
+        isOpen={showPlaylistManager}
+        onClose={() => setShowPlaylistManager(false)}
+        onPlayFile={(path) => {
+          setShowPlaylistManager(false);
+          handlePlay(path);
+        }}
+        libraryFiles={library.filter(e => e.entry_type === 'video').map(e => e.path)}
+      />
 
       {/* Player Click Overlay & Gestures */}
       {isPlayerActive && (
@@ -1051,7 +1059,7 @@ function App() {
 
       {/* Control Bar - Extended */}
       {showAISidebar && (
-        <AISidebar videoPath={currentFile} apiKey={apiKey} />
+        <AISidebar videoPath={currentFile} />
       )}
 
       {isPlayerActive && (
@@ -1259,7 +1267,7 @@ function App() {
               </div>
 
               <button
-                onClick={() => setShowSettings(!showSettings)}
+                onClick={() => setShowAppSettings(!showAppSettings)}
                 className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all"
                 title="Settings"
               >

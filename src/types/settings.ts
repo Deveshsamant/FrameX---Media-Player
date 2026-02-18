@@ -52,6 +52,17 @@ export interface AppSettings {
     thumbnailCacheSize: number;
     defaultLibraryView: 'grid' | 'list';
 
+    // Integrations
+    discordRPC: boolean;
+    openSubtitlesApiKey: string;
+    defaultSubtitleLanguage: string;
+
+    // Video Image Controls (defaults)
+    videoBrightness: number;
+    videoContrast: number;
+    videoSaturation: number;
+    videoGamma: number;
+
     // Keyboard Shortcuts
     keyboardShortcuts: KeyboardShortcuts;
 }
@@ -72,5 +83,12 @@ export const defaultSettings: AppSettings = {
     hardwareAcceleration: true,
     thumbnailCacheSize: 100,
     defaultLibraryView: 'grid',
+    discordRPC: false,
+    openSubtitlesApiKey: '',
+    defaultSubtitleLanguage: 'en',
+    videoBrightness: 0,
+    videoContrast: 0,
+    videoSaturation: 0,
+    videoGamma: 0,
     keyboardShortcuts: { ...defaultShortcuts },
 };

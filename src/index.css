@@ -12,7 +12,8 @@
 
 body {
   @apply text-foreground antialiased;
-  background-color: transparent; /* Allow window transparency */
+  background-color: transparent;
+  /* Allow window transparency */
   margin: 0;
   font-family: 'Inter', system-ui, sans-serif;
   overflow: hidden;

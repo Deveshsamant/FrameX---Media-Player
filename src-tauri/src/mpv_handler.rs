@@ -48,6 +48,12 @@ pub enum MpvCommand {
     SetAudioFilter(String), // generic "af"
     SetEqualizer(Vec<f64>), // simple 5-10 band eq
     SetCompressor(bool),    // toggle compressor
+
+    // Video Image Controls
+    SetBrightness(f64),
+    SetContrast(f64),
+    SetSaturation(f64),
+    SetGamma(f64),
 }
 
 // Use Arc<Mutex> so the thread can clear the sender on shutdown
@@ -321,13 +327,17 @@ fn ensure_mpv_running(state: &State<'_, MpvState>, wid: Option<i64>, app_handle:
                     },
                     MpvCommand::SetCompressor(enable) => {
                         if enable {
-                            // Basic compressor: loud sounds quieter, quiet sounds louder
-                            // af=lavfi=[acompressor]
                             let _ = mpv.set_property("af", "lavfi=[acompressor]");
                         } else {
                             let _ = mpv.set_property("af", "");
                         }
                     }
+
+                    // Video Image Controls
+                    MpvCommand::SetBrightness(val) => { let _ = mpv.set_property("brightness", val as i64); },
+                    MpvCommand::SetContrast(val) => { let _ = mpv.set_property("contrast", val as i64); },
+                    MpvCommand::SetSaturation(val) => { let _ = mpv.set_property("saturation", val as i64); },
+                    MpvCommand::SetGamma(val) => { let _ = mpv.set_property("gamma", val as i64); },
                 }
             }
             
@@ -575,6 +585,49 @@ pub fn mpv_set_audio_filter(state: State<'_, MpvState>, filter: String) {
 pub fn mpv_set_compressor(state: State<'_, MpvState>, enable: bool) {
      if let Some(tx) = state.tx.lock().unwrap().as_ref() {
         let _ = tx.send(MpvCommand::SetCompressor(enable));
+    }
+}
+
+#[command]
+pub fn mpv_set_brightness(state: State<'_, MpvState>, value: f64) {
+    if let Some(tx) = state.tx.lock().unwrap().as_ref() {
+        let _ = tx.send(MpvCommand::SetBrightness(value));
+    }
+}
+
+#[command]
+pub fn mpv_set_contrast(state: State<'_, MpvState>, value: f64) {
+    if let Some(tx) = state.tx.lock().unwrap().as_ref() {
+        let _ = tx.send(MpvCommand::SetContrast(value));
+    }
+}
+
+#[command]
+pub fn mpv_set_saturation(state: State<'_, MpvState>, value: f64) {
+    if let Some(tx) = state.tx.lock().unwrap().as_ref() {
+        let _ = tx.send(MpvCommand::SetSaturation(value));
+    }
+}
+
+#[command]
+pub fn mpv_set_gamma(state: State<'_, MpvState>, value: f64) {
+    if let Some(tx) = state.tx.lock().unwrap().as_ref() {
+        let _ = tx.send(MpvCommand::SetGamma(value));
+    }
+}
+
+#[command]
+pub fn mpv_load_url(window: Window, state: State<'_, MpvState>, url: String) {
+    let wid = window.window_handle().ok().and_then(|h| {
+        match h.as_raw() {
+            RawWindowHandle::Win32(w) => Some(w.hwnd.get() as i64),
+            _ => None,
+        }
+    });
+
+    ensure_mpv_running(&state, wid, window.app_handle().clone());
+    if let Some(tx) = state.tx.lock().unwrap().as_ref() {
+        let _ = tx.send(MpvCommand::LoadFile(url));
     }
 }
 

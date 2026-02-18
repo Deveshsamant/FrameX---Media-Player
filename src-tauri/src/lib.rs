@@ -11,11 +11,15 @@ mod config;
 mod ai;
 mod metadata;
 mod watch_history;
+mod playlist;
+mod subtitle_downloader;
+mod discord_rpc;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(mpv_handler::MpvState::new())
+        .manage(discord_rpc::DiscordRpcState::new())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -53,6 +57,13 @@ pub fn run() {
             mpv_handler::mpv_get_hwdec_status,
             mpv_handler::mpv_set_audio_filter,
             mpv_handler::mpv_set_compressor,
+            // Video Image Controls
+            mpv_handler::mpv_set_brightness,
+            mpv_handler::mpv_set_contrast,
+            mpv_handler::mpv_set_saturation,
+            mpv_handler::mpv_set_gamma,
+            // Stream URL
+            mpv_handler::mpv_load_url,
             //
             file_scanner::list_videos, 
             file_scanner::get_video_duration,
@@ -76,6 +87,21 @@ pub fn run() {
             watch_history::get_watch_position,
             watch_history::get_watch_history,
             watch_history::clear_watch_history,
+            // Playlists & Collections
+            playlist::save_playlist,
+            playlist::get_playlists,
+            playlist::delete_playlist,
+            playlist::save_collection,
+            playlist::get_collections,
+            playlist::delete_collection,
+            // Subtitle Downloader
+            subtitle_downloader::search_subtitles,
+            subtitle_downloader::download_subtitle,
+            // Discord RPC
+            discord_rpc::discord_rpc_connect,
+            discord_rpc::discord_rpc_update,
+            discord_rpc::discord_rpc_disconnect,
+            discord_rpc::discord_rpc_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

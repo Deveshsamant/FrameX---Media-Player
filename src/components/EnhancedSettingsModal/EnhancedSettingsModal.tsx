@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { X, Palette, Play, Layout, Info, Check, Brain, Keyboard } from 'lucide-react';
+import { X, Palette, Play, Layout, Info, Check, Brain, Keyboard, Monitor, Link2 } from 'lucide-react';
 import KeyboardShortcutsEditor from '../KeyboardShortcutsEditor/KeyboardShortcutsEditor';
+import VideoAdjustments from '../VideoAdjustments/VideoAdjustments';
+import Equalizer from '../Equalizer/Equalizer';
+import ThemeEditor from '../ThemeEditor/ThemeEditor';
 import { useTheme } from '../../context/ThemeContext';
 import { useSettings } from '../../context/SettingsContext';
 
@@ -20,7 +23,7 @@ interface Track {
 }
 
 export default function EnhancedSettingsModal({ onClose, isPlayerActive }: EnhancedSettingsModalProps) {
-    const [activeTab, setActiveTab] = useState<'themes' | 'playback' | 'ui' | 'shortcuts' | 'ai' | 'about'>(isPlayerActive ? 'playback' : 'themes');
+    const [activeTab, setActiveTab] = useState<'themes' | 'playback' | 'ui' | 'shortcuts' | 'video' | 'integrations' | 'ai' | 'about'>(isPlayerActive ? 'playback' : 'themes');
     const { theme, setTheme, allThemes } = useTheme();
     const { settings, updateSettings, resetSettings } = useSettings();
 
@@ -98,8 +101,10 @@ export default function EnhancedSettingsModal({ onClose, isPlayerActive }: Enhan
     const tabs = [
         { id: 'themes' as const, label: 'Themes', icon: Palette },
         { id: 'playback' as const, label: 'Playback', icon: Play },
+        { id: 'video' as const, label: 'Video', icon: Monitor },
         { id: 'ui' as const, label: 'UI', icon: Layout },
         { id: 'shortcuts' as const, label: 'Shortcuts', icon: Keyboard },
+        { id: 'integrations' as const, label: 'Integrations', icon: Link2 },
         { id: 'ai' as const, label: 'AI', icon: Brain },
         { id: 'about' as const, label: 'About', icon: Info },
     ];
@@ -192,6 +197,10 @@ export default function EnhancedSettingsModal({ onClose, isPlayerActive }: Enhan
                                         </button>
                                     ))}
                                 </div>
+                            </div>
+
+                            <div className="pt-6 border-t border-white/10">
+                                <ThemeEditor />
                             </div>
                         </div>
                     )}
@@ -550,6 +559,98 @@ export default function EnhancedSettingsModal({ onClose, isPlayerActive }: Enhan
                                                 <span><code>pip install openai-whisper</code></span>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'video' && (
+                        <div className="space-y-8">
+                            <div>
+                                <h3 className="text-xl font-semibold text-white mb-4">Video & Audio</h3>
+                                <VideoAdjustments />
+                            </div>
+                            <div className="h-px bg-white/5" />
+                            <Equalizer />
+                        </div>
+                    )}
+
+                    {activeTab === 'integrations' && (
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="text-xl font-semibold text-white mb-4">Integrations</h3>
+                                <div className="space-y-4">
+                                    {/* Discord RPC */}
+                                    <div className="p-4 bg-white/5 rounded-lg border border-white/5">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-indigo-500/20 rounded-lg">
+                                                    <svg className="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="currentColor">
+                                                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z" />
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-white font-medium">Discord Rich Presence</h4>
+                                                    <p className="text-xs text-slate-400">Show what you're watching</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    const newVal = !settings.discordRPC;
+                                                    updateSettings({ discordRPC: newVal });
+                                                    if (newVal) invoke('discord_rpc_connect');
+                                                    else invoke('discord_rpc_disconnect');
+                                                }}
+                                                className={`relative w-12 h-6 rounded-full transition-colors ${settings.discordRPC ? 'bg-indigo-500' : 'bg-white/10'}`}
+                                            >
+                                                <div
+                                                    className="absolute top-1 w-4 h-4 bg-white rounded-full transition-all"
+                                                    style={{ left: settings.discordRPC ? '26px' : '4px' }}
+                                                />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* OpenSubtitles API Key */}
+                                    <div className="p-4 bg-white/5 rounded-lg border border-white/5">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <div className="p-2 bg-blue-500/20 rounded-lg">
+                                                <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                                                    <path d="M7 15h4M13 15h4M7 11h10" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <h4 className="text-white font-medium">OpenSubtitles</h4>
+                                                <p className="text-xs text-slate-400">API key for subtitle downloads</p>
+                                            </div>
+                                        </div>
+                                        <input
+                                            type="password"
+                                            value={settings.openSubtitlesApiKey}
+                                            onChange={(e) => updateSettings({ openSubtitlesApiKey: e.target.value })}
+                                            placeholder="Enter your OpenSubtitles API key..."
+                                            className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500/50 transition-colors font-mono"
+                                        />
+                                        <p className="text-[10px] text-slate-500 mt-2">
+                                            Get a free key at <span className="text-blue-400">opensubtitles.com/en/consumers</span>
+                                        </p>
+                                    </div>
+
+                                    {/* Default Subtitle Language */}
+                                    <div className="p-4 bg-white/5 rounded-lg border border-white/5">
+                                        <label className="text-white font-medium mb-2 block">Default Subtitle Language</label>
+                                        <select
+                                            value={settings.defaultSubtitleLanguage}
+                                            onChange={(e) => updateSettings({ defaultSubtitleLanguage: e.target.value })}
+                                            className="w-full px-4 py-2 bg-white/10 border border-white/10 rounded-lg text-white appearance-none cursor-pointer outline-none focus:border-white/30 transition-colors"
+                                            style={{ backgroundColor: theme.colors.cardBg, color: theme.colors.text }}
+                                        >
+                                            {['en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'zh', 'ar', 'hi', 'ru'].map(code => (
+                                                <option key={code} value={code} style={{ backgroundColor: theme.colors.cardBg }}>{code.toUpperCase()}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
                             </div>
